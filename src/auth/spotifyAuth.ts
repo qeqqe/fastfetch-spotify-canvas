@@ -34,7 +34,7 @@ export const initAuth = async () => {
   setToken(tokens);
 };
 
-const refreshAccessToken = async (): Promise<string | null> => {
+export const refreshAccessToken = async (): Promise<string | null> => {
   try {
     const tokens = await getToken();
     const refreshToken = tokens.refresh_token;
