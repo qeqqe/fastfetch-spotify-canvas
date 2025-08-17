@@ -15,7 +15,7 @@ Steps
 1. Clone the repo
 
 ```sh
-git clone https://github.com/bartleyg/my-spotify-canvas.git ~/fastfetch-spotify-canvas
+git clone https://github.com/qeqqe/my-spotify-canvas.git ~/fastfetch-spotify-canvas
 ```
 
 2. Install dependencies
