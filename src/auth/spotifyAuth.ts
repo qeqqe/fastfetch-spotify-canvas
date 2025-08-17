@@ -2,13 +2,14 @@ import * as dotenv from "dotenv";
 import * as http from "http";
 import { spawn } from "child_process";
 import { getToken, setToken } from "./token.ts";
-dotenv.config();
+dotenv.config({ debug: false });
 
 const CLIENT_ID = process.env.CLIENT_ID!;
 const CLIENT_SECRET = process.env.CLIENT_SECRET!;
-const REDIRECT_URI = process.env.CALLBACK_URL!;
+const REDIRECT_URI = process.env.REDIRECT_URI!;
 const PORT = process.env.PORT!;
-const SCOPES = "streaming user-read-currently-playing user-read-playback-state";
+const SCOPES =
+  "streaming user-read-currently-playing user-read-playback-state user-read-private user-read-recently-played user-top-read user-read-playback-position ugc-image-upload app-remote-control";
 
 export interface TokenData {
   access_token: string;
@@ -104,7 +105,7 @@ const startCallbackServer = (): Promise<string> => {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       try {
-        const url = new URL(req.url!, REDIRECT_URI);
+        const url = new URL(req.url!, `http://localhost:${PORT}`);
         const code = url.searchParams.get("code");
         const error = url.searchParams.get("error");
 
@@ -121,9 +122,9 @@ const startCallbackServer = (): Promise<string> => {
           `);
           server.close();
           reject(new Error(`Authentication error: ${error}`));
-          if (code) {
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end(`
+        } else if (code) {
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(`
             <html>
               <body>
                 <h1>Authentication Successful!</h1>
@@ -132,9 +133,8 @@ const startCallbackServer = (): Promise<string> => {
               </body>
             </html>
           `);
-            server.close();
-            resolve(code);
-          }
+          server.close();
+          resolve(code);
         }
       } catch (err) {
         server.close();
@@ -142,7 +142,7 @@ const startCallbackServer = (): Promise<string> => {
       }
     });
 
-    server.listen(8888, "localhost", () => {
+    server.listen(parseInt(PORT), "localhost", () => {
       console.log(`🌐 Callback server started on ${REDIRECT_URI}`);
     });
 

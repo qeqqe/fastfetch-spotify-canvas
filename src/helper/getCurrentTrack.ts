@@ -1,10 +1,9 @@
-import * as dotenv from "dotenv";
 import { getToken } from "../auth/token.ts";
 import { initAuth, refreshAccessToken } from "../auth/spotifyAuth.ts";
 
 interface CurrentPlayingRes {
   id: string;
-  images: string | null;
+  images: string;
 }
 
 interface SpotifyError {
