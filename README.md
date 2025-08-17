@@ -1,13 +1,52 @@
 only compatible in kitty terminal
-**Config Tip:**  
-Put in `.bashrc` or `.zshrc`:
+Requirements
+
+- kitty terminal
+- bun
+- pnpm
+- SP_DC cookie from the Spotify web
+
+Steps
+
+1. Clone the repo
 
 ```sh
-alias fastfetch='fastfetch --logo "/home/qeqqer/images/fastfetch/media/*"'
-# for now
-alias fetchcanvas='bun ~/codebase/fastfetch-spotify-canvas/src/index.ts  > /dev/null 2>&1'
-
-fetchcanvas
-
-kitten icat -n --place 50x50@0x6 --scale-up --align left ~/images/fastfetch/media/* | fastfetch --logo-width 50 --raw -
+git clone https://github.com/bartleyg/my-spotify-canvas.git ~/fastfetch-spotify-canvas
 ```
+
+2. Install dependencies
+
+```sh
+cd ~/fastfetch-spotify-canvas
+pnpm install
+# or if you prefer bun:
+bun install
+```
+
+3. Create your environment file
+
+- Rename .env.example to .env
+- Put your SP_DC cookie value into .env
+
+4. Add the alias to your shell config
+   Put this in ~/.bashrc or ~/.zshrc:
+
+```sh
+alias fetchcanvas="$HOME/fastfetch-spotify-canvas/script.sh"
+```
+
+Then reload your shell config:
+
+```sh
+source ~/.bashrc
+# or
+source ~/.zshrc
+```
+
+5. Run
+
+```sh
+fetchcanvas
+```
+
+special thanks to https://github.com/bartleyg/my-spotify-canvas.git

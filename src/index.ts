@@ -1,3 +1,3 @@
-import { getCanvas } from "./canvas/getCanvas.ts";
+import { getCanvases } from "./canvas/getCanvas.ts";
 
-getCanvas();
+getCanvases();

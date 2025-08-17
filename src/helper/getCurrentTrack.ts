@@ -1,127 +1,143 @@
-import { getToken } from "../auth/token.ts";
-import { initAuth, refreshAccessToken } from "../auth/spotifyAuth.ts";
+import { getToken } from "../auth/spotifyAuth.ts";
+import * as dotenv from "dotenv";
+
+dotenv.config();
+
+const SP_DC = process.env.SP_DC;
 
 interface CurrentPlayingRes {
   id: string;
   images: string;
+  uri: string;
 }
 
-interface SpotifyError {
-  error: {
-    status: number;
-    message: string;
+interface SpotifyInternalError {
+  error?: {
+    status?: number;
+    message?: string;
   };
 }
 
-export const getCurrentTrackHelper =
-  async (): Promise<CurrentPlayingRes | null> => {
-    const MAX_RETRIES = 1;
+function userAgent(): string {
+  return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
+}
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const tokens = await getToken();
-
-        if (!tokens.access_token || !tokens.refresh_token) {
-          console.log("No valid tokens found, initiating auth flow...");
-          await initAuth();
-          const newTokens = await getToken();
-          if (!newTokens.access_token) {
-            throw new Error(
-              "Failed to obtain access token after authentication"
-            );
-          }
-        }
-
-        const response = await fetch(
-          "https://api.spotify.com/v1/me/player/currently-playing",
-          {
-            headers: {
-              Authorization: `Bearer ${tokens.access_token}`,
-            },
-          }
-        );
-
-        if (response.status === 401 && attempt < MAX_RETRIES) {
-          console.log("Access token expired, refreshing...");
-          await refreshAccessToken();
-          continue;
-        }
-
-        if (response.status === 429) {
-          const retryAfter = response.headers.get("Retry-After");
-          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 1000;
-          console.log(`Rate limited, waiting ${waitTime}ms...`);
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-          continue;
-        }
-
-        if (response.status === 204) {
-          console.log("No track currently playing");
-          return null;
-        }
-
-        if (!response.ok) {
-          let errorMessage = `HTTP ${response.status}`;
-          try {
-            const errorData: SpotifyError = await response.json();
-            errorMessage = errorData.error?.message || errorMessage;
-          } catch {}
-          throw new Error(`Spotify API error: ${errorMessage}`);
-        }
-
-        const data = await response.json();
-
-        if (!data?.item?.id) {
-          console.log("No valid track data in response");
-          return null;
-        }
-
-        const track = data.item;
-
-        return {
-          id: track.id,
-          images: track.album.images[0].url,
-        };
-      } catch (error) {
-        if (attempt === MAX_RETRIES) {
-          console.error("Failed to get currently playing track:", error);
-          return null;
-        }
-        console.warn(`Attempt ${attempt + 1} failed, retrying...`, error);
-      }
-    }
-
-    return null;
-  };
-
-const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
-  const MAX_RETRIES = 1;
+const getCurrentTrackHelper = async (): Promise<CurrentPlayingRes | null> => {
+  const MAX_RETRIES = 2;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const tokens = await getToken();
+      const accessToken = await getToken();
 
-      if (!tokens.access_token || !tokens.refresh_token) {
-        console.log("No valid tokens found, initiating auth flow...");
-        await initAuth();
-        const newTokens = await getToken();
-        if (!newTokens.access_token) {
-          throw new Error("Failed to obtain access token after authentication");
+      if (!accessToken) {
+        throw new Error("Failed to obtain access token");
+      }
+
+      const response = await fetch(
+        "https://api.spotify.com/v1/me/player/currently-playing",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "User-Agent": userAgent(),
+            Origin: "https://open.spotify.com",
+            Referer: "https://open.spotify.com/",
+            Cookie: `sp_dc=${SP_DC}`,
+          },
+          signal: AbortSignal.timeout(10000),
         }
+      );
+
+      if (response.status === 401 && attempt < MAX_RETRIES) {
+        console.log("Access token expired, retrying with fresh token...");
+        continue;
+      }
+
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("Retry-After");
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 1000;
+        console.log(`Rate limited, waiting ${waitTime}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      if (response.status === 204) {
+        console.log("No track currently playing");
+        return null;
+      }
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData: SpotifyInternalError = await response.json();
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch {
+          // no
+        }
+        throw new Error(`Spotify API error: ${errorMessage}`);
+      }
+
+      const data = await response.json();
+
+      if (!data?.item?.id) {
+        console.log("No valid track data in response");
+        return null;
+      }
+
+      const track = data.item;
+      const imageUrl = track.album?.images?.[0]?.url || null;
+      const track_uri = data.item.uri;
+
+      if (!imageUrl) {
+        console.warn("No album image found for current track");
+      }
+
+      return {
+        id: track.id,
+        images: imageUrl,
+        uri: track_uri,
+      };
+    } catch (error) {
+      if (attempt === MAX_RETRIES) {
+        console.error("Failed to get currently playing track:", error);
+        return null;
+      }
+      console.warn(`Attempt ${attempt + 1} failed, retrying...`, error);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  return null;
+};
+
+const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
+  const MAX_RETRIES = 2;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const accessToken = await getToken();
+
+      if (!accessToken) {
+        throw new Error("Failed to obtain access token");
       }
 
       const response = await fetch(
         "https://api.spotify.com/v1/me/player/recently-played?limit=1",
         {
+          method: "GET",
           headers: {
-            Authorization: `Bearer ${tokens.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
+            "User-Agent": userAgent(),
+            Origin: "https://open.spotify.com",
+            Referer: "https://open.spotify.com/",
+            Cookie: `sp_dc=${SP_DC}`,
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
 
       if (response.status === 401 && attempt < MAX_RETRIES) {
-        console.log("Access token expired, refreshing...");
-        await refreshAccessToken();
+        console.log("Access token expired, retrying with fresh token...");
         continue;
       }
 
@@ -136,7 +152,7 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
-          const errorData: SpotifyError = await response.json();
+          const errorData: SpotifyInternalError = await response.json();
           errorMessage = errorData.error?.message || errorMessage;
         } catch {}
         throw new Error(`Spotify API error: ${errorMessage}`);
@@ -160,9 +176,16 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
         return null;
       }
 
+      const imageUrl = recentTrack.album?.images?.[0]?.url || null;
+      const track_uri = data.item.uri;
+      if (!imageUrl) {
+        console.warn("No album image found for recent track");
+      }
+
       return {
         id: recentTrack.id,
-        images: recentTrack.album?.images?.[0]?.url || null,
+        images: imageUrl,
+        uri: track_uri,
       };
     } catch (error) {
       if (attempt === MAX_RETRIES) {
@@ -170,6 +193,7 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
         return null;
       }
       console.warn(`Attempt ${attempt + 1} failed, retrying...`, error);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
@@ -177,14 +201,22 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
 };
 
 export const getTrackInfo = async (): Promise<CurrentPlayingRes | null> => {
+  console.log("Getting current track info...");
+
   let result = await getCurrentTrackHelper();
 
   if (!result) {
+    console.log("No current track, falling back to recently played...");
     result = await getRecentlyPlayedTrack();
+
     if (!result) {
-      console.error("No tracks found");
+      console.error("No tracks found in current or recently played");
       return null;
     }
+
+    console.log("Found recently played track");
+  } else {
+    console.log("Found currently playing track");
   }
 
   return result;
