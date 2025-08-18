@@ -32,7 +32,11 @@ bun install
 - Rename .env.example to .env
 - Put your SP_DC cookie value into .env
 
-4. Add the alias to your shell config
+4. Make the script executable.
+```sh
+chmod +x ./script.sh
+```
+5. Add the alias to your shell config
    Put this in ~/.bashrc or ~/.zshrc:
 
 ```sh
@@ -53,4 +57,4 @@ source ~/.zshrc
 fetchcanvas
 ```
 
-special thanks to https://github.com/bartleyg/my-spotify-canvas.git
+special thanks to https://github.com/bartleyg/my-spotify-canvas.git for reverse engineering the canvas api.
