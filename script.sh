@@ -1,8 +1,7 @@
-
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd ~/fastfetch-spotify-canvas && bun src/index.ts > /dev/null 2>&1 && cd
+cd ~/fastfetch-spotify-canvas && bun dist/index.cjs > /dev/null 2>&1 && cd
 
 MEDIA_DIR="$HOME/images/fastfetch/media"
 
@@ -25,7 +24,7 @@ ext="${ext,,}"  # lowercase
 
 case "$ext" in
     jpg|jpeg)
-        kitten icat -n --place 35x35@0x6 --scale-up --align left "$file" | fastfetch --logo-width 35 --raw -
+        kitten icat -n --place 45x45@0x6 --scale-up --align left "$file" | fastfetch --logo-width 45 --raw -
         ;;
     gif)
         kitten icat -n --place 30x30@0x6 --scale-up --align left "$file" | fastfetch --logo-width 30 --raw -

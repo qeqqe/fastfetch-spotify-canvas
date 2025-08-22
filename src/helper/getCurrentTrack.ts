@@ -177,7 +177,7 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
       }
 
       const imageUrl = recentTrack.album?.images?.[0]?.url || null;
-      const track_uri = data.item.uri;
+      const track_uri = recentTrack.uri;
       if (!imageUrl) {
         console.warn("No album image found for recent track");
       }

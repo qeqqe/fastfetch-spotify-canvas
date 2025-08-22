@@ -27,15 +27,19 @@ pnpm install
 bun install
 ```
 
-3. Create your environment file
+3. Build
+
+```sh
+pnpm run build
+# or if you prefer bun:
+bun run build
+```
+
+4. Create your environment file
 
 - Rename .env.example to .env
 - Put your SP_DC cookie value into .env
 
-4. Make the script executable.
-```sh
-chmod +x ./script.sh
-```
 5. Add the alias to your shell config
    Put this in ~/.bashrc or ~/.zshrc:
 
