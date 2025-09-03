@@ -1,6 +1,6 @@
-import { getToken } from "../auth/spotifyAuth.ts";
-import { getTrackInfo } from "../helper/getCurrentTrack.ts";
-import * as canvas from "../proto/_canvas.ts";
+import { getToken } from "../auth/spotifyAuth.js";
+import { CurrentPlayingRes, getTrackInfo } from "../helper/getCurrentTrack.js";
+import * as canvas from "../proto/_canvas.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
@@ -59,7 +59,10 @@ export async function getCanvases(): Promise<any | null> {
       console.error("Failed to obtain access token");
       return null;
     }
-    const track_info = await getTrackInfo();
+    const track_info: CurrentPlayingRes | null = await getTrackInfo();
+    if (track_info && (await alreadyExists(track_info.album_uri))) {
+      process.exit(0);
+    }
     const canvasRequest = new CanvasRequest();
     const track = new CanvasRequest.Track();
     if (!track_info?.uri) {
@@ -98,18 +101,33 @@ export async function getCanvases(): Promise<any | null> {
 
     const canvasResponse = CanvasResponse.deserializeBinary(responseBytes);
     if (canvasResponse?.canvases?.[0]?.canvas_url) {
-      await downloadMedia(canvasResponse.canvases[0].canvas_url, "canvas");
+      await downloadMedia(
+        canvasResponse.canvases[0].canvas_url,
+        "canvas",
+        track_info.album_uri
+      );
     } else {
-      await downloadMedia(track_info.images, "image");
+      await downloadMedia(track_info.images, "image", track_info.album_uri);
     }
     return canvasResponse.toObject();
   } catch (error) {
     return null;
   }
 }
+
+async function alreadyExists(album_uri: string): Promise<boolean> {
+  const outputDir = path.join(os.homedir(), "images", "fastfetch", "media");
+  try {
+    const files = await fs.readdir(outputDir);
+    return files.some((file: string) => path.parse(file).name === album_uri);
+  } catch {
+    return false;
+  }
+}
 async function downloadMedia(
   url: string,
-  mediaType: "canvas" | "image"
+  mediaType: "canvas" | "image",
+  album_uri: string
 ): Promise<void> {
   try {
     const response = await fetch(url);
@@ -120,24 +138,41 @@ async function downloadMedia(
     const outputDir = path.join(os.homedir(), "images", "fastfetch", "media");
     await fs.mkdir(outputDir, { recursive: true });
 
-    const files = await fs.readdir(outputDir);
-    for (const file of files) {
-      if (file.startsWith("media.")) {
-        await fs.unlink(path.join(outputDir, file));
+    // wipe everything in the dir
+    try {
+      const existingFiles = await fs.readdir(outputDir);
+      for (const file of existingFiles) {
+        try {
+          await fs.unlink(path.join(outputDir, file));
+        } catch {
+          // ignore
+        }
       }
+    } catch {
+      // ignore
     }
+
+    // sanitize
+    const baseName = (album_uri || "media").replace(/[^\w.-]/g, "_");
 
     if (mediaType === "canvas") {
       const inputBuffer = Buffer.from(await response.arrayBuffer());
-      const tempInputPath = path.join(outputDir, `media_input${extension}`);
-      const outputGifPath = path.join(outputDir, `media.gif`);
+      const tempInputPath = path.join(
+        outputDir,
+        `${baseName}_input${extension}`
+      );
+      const outputGifPath = path.join(outputDir, `${baseName}.gif`);
 
       await fs.writeFile(tempInputPath, inputBuffer);
 
       try {
-        // dynamic import to avoid touching top-level imports
         const ffmpegImport: any = await import("fluent-ffmpeg");
         const ffmpeg = ffmpegImport.default ?? ffmpegImport;
+
+        // ensure any gif is removed
+        try {
+          await fs.unlink(outputGifPath);
+        } catch {}
 
         await new Promise<void>((resolve, reject) => {
           ffmpeg()
@@ -149,12 +184,34 @@ async function downloadMedia(
             .on("error", (err: any) => reject(err))
             .save(outputGifPath);
         });
+
+        // after conversion, remove any mp4s that match the baseName
+        try {
+          const postFiles = await fs.readdir(outputDir);
+          for (const f of postFiles) {
+            if (
+              f.startsWith(baseName) &&
+              path.extname(f).toLowerCase() === extension
+            ) {
+              try {
+                await fs.unlink(path.join(outputDir, f));
+              } catch {
+                // ignore
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
       } catch (err) {
         console.log(
           "FFmpeg conversion failed, falling back to saving original video:",
           err
         );
-        const fallbackPath = path.join(outputDir, `media${extension}`);
+        const fallbackPath = path.join(outputDir, `${baseName}${extension}`);
+        try {
+          await fs.unlink(fallbackPath);
+        } catch {}
         await fs.writeFile(fallbackPath, inputBuffer);
         console.log(`Saved original media as: ${fallbackPath}`);
       } finally {
@@ -167,8 +224,16 @@ async function downloadMedia(
     }
 
     const buffer = new Uint8Array(await response.arrayBuffer());
-    const filePath = path.join(outputDir, `media${extension}`);
-    await fs.writeFile(filePath, buffer);
+    const filePath = path.join(outputDir, `${baseName}${extension}`);
+    const tmpPath = path.join(outputDir, `${baseName}.tmp`);
+
+    // ensure no existing file
+    try {
+      await fs.unlink(filePath);
+    } catch {}
+
+    await fs.writeFile(tmpPath, buffer);
+    await fs.rename(tmpPath, filePath);
   } catch (error) {
     console.log(`Download failed: ${error}`);
   }

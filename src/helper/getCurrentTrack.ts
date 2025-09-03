@@ -1,14 +1,15 @@
-import { getToken } from "../auth/spotifyAuth.ts";
+import { getToken } from "../auth/spotifyAuth.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
 
 const SP_DC = process.env.SP_DC;
 
-interface CurrentPlayingRes {
+export interface CurrentPlayingRes {
   id: string;
   images: string;
   uri: string;
+  album_uri: string;
 }
 
 interface SpotifyInternalError {
@@ -69,7 +70,7 @@ const getCurrentTrackHelper = async (): Promise<CurrentPlayingRes | null> => {
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
-          const errorData: SpotifyInternalError = await response.json();
+          const errorData = (await response.json()) as SpotifyInternalError;
           errorMessage = errorData.error?.message || errorMessage;
         } catch {
           // no
@@ -77,7 +78,7 @@ const getCurrentTrackHelper = async (): Promise<CurrentPlayingRes | null> => {
         throw new Error(`Spotify API error: ${errorMessage}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as { item?: any };
 
       if (!data?.item?.id) {
         console.log("No valid track data in response");
@@ -86,7 +87,8 @@ const getCurrentTrackHelper = async (): Promise<CurrentPlayingRes | null> => {
 
       const track = data.item;
       const imageUrl = track.album?.images?.[0]?.url || null;
-      const track_uri = data.item.uri;
+      const track_uri = track.uri;
+      const album_uri = track.album?.uri.split(":").pop();
 
       if (!imageUrl) {
         console.warn("No album image found for current track");
@@ -96,6 +98,7 @@ const getCurrentTrackHelper = async (): Promise<CurrentPlayingRes | null> => {
         id: track.id,
         images: imageUrl,
         uri: track_uri,
+        album_uri: album_uri,
       };
     } catch (error) {
       if (attempt === MAX_RETRIES) {
@@ -152,13 +155,13 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
-          const errorData: SpotifyInternalError = await response.json();
+          const errorData = (await response.json()) as SpotifyInternalError;
           errorMessage = errorData.error?.message || errorMessage;
         } catch {}
         throw new Error(`Spotify API error: ${errorMessage}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as { items?: any[] };
 
       if (
         !data?.items ||
@@ -186,6 +189,7 @@ const getRecentlyPlayedTrack = async (): Promise<CurrentPlayingRes | null> => {
         id: recentTrack.id,
         images: imageUrl,
         uri: track_uri,
+        album_uri: recentTrack.album?.uri.split(":").pop(),
       };
     } catch (error) {
       if (attempt === MAX_RETRIES) {
