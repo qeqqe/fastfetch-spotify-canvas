@@ -6,7 +6,9 @@ Requirements
 - pnpm
 - SP_DC cookie from the Spotify web
 
-[![Demo Video]](assets/demo.mp4)
+Showcase.
+
+https://github.com/user-attachments/assets/dba217df-87bb-4916-8afd-80af3994f876
 
 Steps
 
