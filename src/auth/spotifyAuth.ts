@@ -5,12 +5,12 @@ dotenv.config();
 
 const SP_DC = process.env.SP_DC;
 const SECRETS_URL =
-  "https://raw.githubusercontent.com/Thereallo1026/spotify-secrets/refs/heads/main/secrets/secretDict.json";
+  "https://raw.githubusercontent.com/xyloflake/spot-secrets-go/refs/heads/main/secrets/secretDict.json";
 
 let currentTotp: OTPAuth.TOTP | null = null;
 let currentTotpVersion: string | null = null;
 let lastFetchTime = 0;
-const FETCH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
+const FETCH_INTERVAL = 60 * 60 * 1000; 
 
 let updatePromise: Promise<void> | null = null;
 
@@ -71,11 +71,10 @@ function findNewestVersion(secrets: SecretsDict): string {
 }
 
 function useFallbackSecret(): void {
-  // Fallback to the original hardcoded secret
   // This secret will most likely fail because Spotify rotates secrets every couple of days
+  // v61 
   const fallbackData = [
-    99, 111, 47, 88, 49, 56, 118, 65, 52, 67, 50, 104, 117, 101, 55, 94, 95, 75,
-    94, 49, 69, 36, 85, 64, 74, 60,
+    44, 55, 47, 42, 70, 40, 34, 114, 76, 74, 50, 111, 120, 97, 75, 76, 94, 102, 43, 69, 49, 120, 118, 80, 64, 78 
   ];
   const totpSecret = createTotpSecret(fallbackData);
 

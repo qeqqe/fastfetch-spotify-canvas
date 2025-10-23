@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd ~/fastfetch-spotify-canvas && bun dist/index.cjs > /dev/null 2>&1 && cd
+cd ~/fastfetch-spotify-canvas && bun dist/index.cjs > /dev/null 2>&1  && cd
 
 MEDIA_DIR="$HOME/images/fastfetch/media"
 
