@@ -4,6 +4,13 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const SP_DC = process.env.SP_DC;
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const SPOTIFY_REFRESH_TOKEN = process.env.SPOTIFY_REFRESH_TOKEN;
+
+// token caching
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt = 0;
 const SECRETS_URL =
   "https://raw.githubusercontent.com/xyloflake/spot-secrets-go/refs/heads/main/secrets/secretDict.json";
 
@@ -194,6 +201,56 @@ async function generateAuthPayload(
     totpVer: currentTotpVersion || "19",
     totpServer: generateTOTP(Math.floor(serverTime / 30)),
   };
+}
+
+// get OAuth access token using refresh token flow with caching
+// tokens are cached for 1 hour (expires_in - 60 seconds for safety)
+export async function getAccessToken(): Promise<string> {
+  if (cachedAccessToken && Date.now() < tokenExpiresAt) {
+    return cachedAccessToken;
+  }
+
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) {
+    throw new Error(
+      "Missing Spotify OAuth credentials. Please set SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REFRESH_TOKEN in .env"
+    );
+  }
+
+  try {
+    const response = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization:
+          "Basic " +
+          Buffer.from(
+            `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`
+          ).toString("base64"),
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: SPOTIFY_REFRESH_TOKEN,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as {
+      access_token: string;
+      expires_in: number;
+    };
+
+    cachedAccessToken = data.access_token;
+    tokenExpiresAt = Date.now() + data.expires_in * 1000 - 60000;
+
+    return cachedAccessToken;
+  } catch (error) {
+    console.error("Failed to get OAuth access token:", error);
+    throw error;
+  }
 }
 
 export async function getToken(

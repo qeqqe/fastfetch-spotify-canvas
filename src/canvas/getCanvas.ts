@@ -56,11 +56,17 @@ export async function getCanvases(): Promise<any | null> {
 
     const accessToken = await getToken();
     if (!accessToken) {
-      console.error("Failed to obtain access token");
+      console.error("Failed to obtain Canvas API token");
       return null;
     }
+
     const track_info: CurrentPlayingRes | null = await getTrackInfo();
-    if (track_info && (await alreadyExists(track_info.album_uri))) {
+    if (!track_info) {
+      return null;
+    }
+
+    if (await alreadyExists(track_info.album_uri)) {
+      console.log("Canvas already exists for this album");
       process.exit(0);
     }
     const canvasRequest = new CanvasRequest();
@@ -101,16 +107,19 @@ export async function getCanvases(): Promise<any | null> {
 
     const canvasResponse = CanvasResponse.deserializeBinary(responseBytes);
     if (canvasResponse?.canvases?.[0]?.canvas_url) {
+      console.log("Got canvas for track");
       await downloadMedia(
         canvasResponse.canvases[0].canvas_url,
         "canvas",
         track_info.album_uri
       );
     } else {
+      console.log("No canvas available, using album cover");
       await downloadMedia(track_info.images, "image", track_info.album_uri);
     }
     return canvasResponse.toObject();
   } catch (error) {
+    console.error("Failed to get canvas:", error);
     return null;
   }
 }
@@ -178,9 +187,11 @@ async function downloadMedia(
           ffmpeg()
             .input(tempInputPath)
             .outputFormat("gif")
-            // options for reasonable size/quality- adjust if needed
             .outputOptions(["-vf", "fps=15,scale=480:-1:flags=lanczos"])
-            .on("end", () => resolve())
+            .on("end", () => {
+              console.log(`Downloaded canvas: ${outputGifPath}`);
+              resolve();
+            })
             .on("error", (err: any) => reject(err))
             .save(outputGifPath);
         });
@@ -204,16 +215,12 @@ async function downloadMedia(
           // ignore
         }
       } catch (err) {
-        console.log(
-          "FFmpeg conversion failed, falling back to saving original video:",
-          err
-        );
         const fallbackPath = path.join(outputDir, `${baseName}${extension}`);
         try {
           await fs.unlink(fallbackPath);
         } catch {}
         await fs.writeFile(fallbackPath, inputBuffer);
-        console.log(`Saved original media as: ${fallbackPath}`);
+        console.log(`Downloaded canvas (video): ${fallbackPath}`);
       } finally {
         try {
           await fs.unlink(tempInputPath);
@@ -234,7 +241,8 @@ async function downloadMedia(
 
     await fs.writeFile(tmpPath, buffer);
     await fs.rename(tmpPath, filePath);
+    console.log(`Downloaded cover: ${filePath}`);
   } catch (error) {
-    console.log(`Download failed: ${error}`);
+    console.error(`Download failed: ${error}`);
   }
 }

@@ -39,6 +39,7 @@ bun run build
 
 - Rename .env.example to .env
 - Put your SP_DC cookie value into .env
+- Create a spotify developer app to get client id and client secret, and put them into .env, then authenticate once and get the refresh token and put it in the .env
 
 5. Add the alias to your shell config
    Put this in ~/.bashrc or ~/.zshrc:
