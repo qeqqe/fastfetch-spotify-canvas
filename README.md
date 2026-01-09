@@ -1,13 +1,12 @@
 
 # Fastfetch Spotify Canvas
 
-Only compatible in kitty terminal
+Only compatible in Terminals with Kitty graphics protocol.
 
 ## Requirements
 
-- kitty terminal
-- bun
-- pnpm
+- KGI supported terminal
+- bun/pnpm
 
 ## Showcase
 
