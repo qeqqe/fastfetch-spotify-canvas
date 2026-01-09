@@ -1,4 +1,4 @@
-```markdown
+
 # Fastfetch Spotify Canvas
 
 Only compatible in kitty terminal
@@ -122,4 +122,3 @@ Done! Your `.env` should now have all three values. The access token will auto-r
 ---
 
 Special thanks to https://github.com/bartleyg/my-spotify-canvas.git for reverse engineering the Canvas API.
-```
