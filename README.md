@@ -78,6 +78,8 @@ Complete Spotify OAuth setup entirely from the terminal:
 2. **Add credentials to `.env`**
 
 ```sh
+SP_DC=get-from-spotify-web-cookies
+
 SPOTIFY_CLIENT_ID=your_client_id_here
 SPOTIFY_CLIENT_SECRET=your_client_secret_here
 ```
