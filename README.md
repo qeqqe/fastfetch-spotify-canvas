@@ -11,7 +11,7 @@ Only compatible in Terminals with Kitty graphics protocol.
 ## Showcase
 
 
-![Demo](https://github.com/user-attachments/assets/dba217df-87bb-4916-8afd-80af3994f876)
+https://github.com/user-attachments/assets/dba217df-87bb-4916-8afd-80af3994f876
 
 ## Steps
 
